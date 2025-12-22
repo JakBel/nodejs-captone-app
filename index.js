@@ -19,80 +19,133 @@ const __dirname = dirname(__filename);
 /* === USE === */
 app.use(cors());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 app.use(express.static(__dirname + "/public"));
 
 /* === GET === */
-app.get("/", (req, res) => {
+app.get("/", (_, res) => {
   res.sendFile(__dirname + "/views/index.html");
 });
 
-app.get("/api/users", async (req, res) => {
-  const users = await User.find();
+app.get("/api/users", async (_, res) => {
+  try {
+    const users = await User.find();
 
-  res.json(users);
+    res.json(users);
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({ status: "error", message: "Server error" });
+  }
 });
 
 app.get("/api/users/:_id/logs", async (req, res) => {
-  const userId = req.params._id;
-  let query = Exercise.find({ userId: userId });
-  let dateObj = {};
+  try {
+    const userId = req.params._id;
+    const user = await User.findById(userId);
 
-  if (req.query.from !== undefined) dateObj["$gte"] = new Date(req.query.from);
+    if (!user) {
+      return res.status(404).json({
+        status: "fail",
+        message: "User not found",
+      });
+    }
 
-  if (req.query.to !== undefined) dateObj["$lte"] = new Date(req.query.to);
+    let query = Exercise.find({ userId: userId });
+    const dateObj = {};
 
-  if (Object.keys(dateObj).length > 0) query.find({ date: dateObj });
+    if (req.query.from !== undefined)
+      dateObj["$gte"] = new Date(req.query.from);
 
-  if (req.query.limit) query.limit(Number(req.query.limit));
+    if (req.query.to !== undefined) dateObj["$lte"] = new Date(req.query.to);
 
-  const user = await User.findById(userId);
-  const exercises = await query;
+    if (Object.keys(dateObj).length > 0) query.find({ date: dateObj });
 
-  const log = exercises.map((val) => ({
-    description: val.description,
-    duration: +val.duration,
-    date: val.date.toDateString(),
-  }));
+    if (req.query.limit) query.limit(Number(req.query.limit));
 
-  res.json({
-    username: user.username,
-    _id: user._id,
-    count: log.length,
-    log: log,
-  });
+    const exercises = await query;
+
+    const log = exercises.map((val) => ({
+      description: val.description,
+      duration: +val.duration,
+      date: val.date.toDateString(),
+    }));
+
+    res.json({
+      username: user.username,
+      _id: user._id,
+      count: log.length,
+      log: log,
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({ status: "error", message: "Server error" });
+  }
 });
 
 /* === POST === */
 app.post("/api/users", async (req, res) => {
-  const userObj = new User({ username: req.body.username });
-  await userObj.save();
+  try {
+    const { username } = req.body;
 
-  res.json(userObj);
+    if (!username) {
+      return res
+        .status(400)
+        .json({ status: "fail", message: "Username is required" });
+    }
+
+    const userObj = new User({ username: username });
+    await userObj.save();
+
+    res.status(201).json(userObj);
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({ status: "error", message: "Server error" });
+  }
 });
 
 app.post("/api/users/:_id/exercises", async (req, res) => {
-  const userId = req.params._id;
-  const user = await User.findById(userId);
-  let exercise;
+  try {
+    const userId = req.params._id;
+    const { description, duration, date } = req.body;
 
-  if (user) {
-    exercise = new Exercise({
+    if (!userId || !description || !duration) {
+      return res.status(400).json({
+        status: "fail",
+        message: "UserID, Description and duration are required",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user)
+      return res
+        .status(404)
+        .json({ status: "fail", message: "User not found" });
+
+    const exercise = new Exercise({
       userId: userId,
-      description: req.body.description,
-      duration: req.body.duration,
-      date: req.body.date || new Date(),
+      description,
+      duration: duration,
+      date: date ? new Date(date) : new Date(),
     });
 
     await exercise.save();
-  }
 
-  res.json({
-    _id: user._id,
-    username: user.username,
-    description: exercise.description,
-    duration: exercise.duration,
-    date: exercise.date.toDateString(),
-  });
+    res.json({
+      _id: user._id,
+      username: user.username,
+      description: exercise.description,
+      duration: exercise.duration,
+      date: exercise.date.toDateString(),
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({ status: "error", message: "Server error" });
+  }
 });
 
 /* === LISTENING === */

@@ -1,7 +1,12 @@
 import mongoose from "mongoose";
 
 export const userSchema = new mongoose.Schema({
-  username: String,
+  username: {
+    type: String,
+    required: [true, "Username is required"],
+    trim: true,
+    unique: true,
+  },
 });
 
 export const exerciseSchema = new mongoose.Schema({
@@ -10,7 +15,18 @@ export const exerciseSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
-  description: String,
-  duration: Number,
-  date: Date,
+  description: {
+    type: String,
+    required: [true, "Description is required"],
+    trim: true,
+  },
+  duration: {
+    type: Number,
+    required: [true, "Duration is required"],
+    min: [1, "Duration must be a positive number"],
+  },
+  date: {
+    type: Date,
+    default: Date.now,
+  },
 });
