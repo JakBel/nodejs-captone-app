@@ -80,7 +80,7 @@ app.get("/api/users/:_id/logs", async (req, res) => {
   } catch (err) {
     console.error(err);
 
-    res.status(500).json({ status: "error", message: "Server error" });
+    res.status(500).json({ status: "error", message: "Invalid data" });
   }
 });
 
@@ -102,7 +102,7 @@ app.post("/api/users", async (req, res) => {
   } catch (err) {
     console.error(err);
 
-    res.status(500).json({ status: "error", message: "Server error" });
+    res.status(500).json({ status: "error", message: "Invalid data" });
   }
 });
 
@@ -146,6 +146,13 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
 
     res.status(500).json({ status: "error", message: "Server error" });
   }
+});
+
+app.all("*", (req, res) => {
+  res.status(404).json({
+    status: "fail",
+    message: `User ID is required`,
+  });
 });
 
 /* === LISTENING === */
