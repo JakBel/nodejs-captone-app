@@ -89,10 +89,10 @@ app.post("/api/users", async (req, res) => {
   try {
     const { username } = req.body;
 
-    if (!username) {
+    if (!username || username.trim().length === 0) {
       return res
         .status(400)
-        .json({ status: "fail", message: "Username is required" });
+        .json({ status: "fail", message: "Incorrect username provided" });
     }
 
     const userObj = new User({ username: username });
@@ -102,7 +102,14 @@ app.post("/api/users", async (req, res) => {
   } catch (err) {
     console.error(err);
 
-    res.status(500).json({ status: "error", message: "Invalid data" });
+    if (err.code === 11000) {
+      return res.status(400).json({
+        status: "fail",
+        message: "This user already exists in database",
+      });
+    }
+
+    res.status(500).json({ status: "error", message: "Server error" });
   }
 });
 
@@ -111,25 +118,46 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
     const userId = req.params._id;
     const { description, duration, date } = req.body;
 
-    if (!userId || !description || !duration) {
+    if (!description || !duration) {
       return res.status(400).json({
         status: "fail",
-        message: "UserID, Description and duration are required",
+        message: "Description and duration are required",
       });
     }
 
-    const user = await User.findById(userId);
+    const durationNum = Number(duration);
+    const dateObj = date ? new Date(date) : new Date();
 
-    if (!user)
+    if (isNaN(durationNum) || isNaN(dateObj.getTime())) {
+      return res.status(400).json({
+        status: "fail",
+        message:
+          "Description must be 'string', duration 'number' and a date written in the format 'yyyy-mm-dd'",
+      });
+    }
+
+    let user;
+
+    try {
+      user = await User.findById(userId);
+    } catch (err) {
+      return res.status(404).json({
+        status: "fail",
+        message: "User with this ID does not exist",
+      });
+    }
+
+    if (!user) {
       return res
         .status(404)
-        .json({ status: "fail", message: "User not found" });
+        .json({ status: "fail", message: "User with this ID does not exist" });
+    }
 
     const exercise = new Exercise({
       userId: userId,
       description,
-      duration: duration,
-      date: date ? new Date(date) : new Date(),
+      duration: durationNum,
+      date: dateObj,
     });
 
     await exercise.save();
@@ -148,11 +176,15 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
   }
 });
 
-app.all("*", (req, res) => {
-  res.status(404).json({
+app.post("/api/users//exercises", (_, res) => {
+  res.status(400).json({
     status: "fail",
-    message: `User ID is required`,
+    message: "User ID is required",
   });
+});
+
+app.use((_, res) => {
+  res.status(404).send("No page found");
 });
 
 /* === LISTENING === */
