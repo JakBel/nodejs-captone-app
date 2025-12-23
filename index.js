@@ -51,21 +51,21 @@ app.get("/api/users/:_id/logs", async (req, res) => {
       });
     }
 
-    let query = Exercise.find({ userId: userId });
-    const dateObj = {};
+    let filter = { userId: userId };
 
-    if (req.query.from !== undefined)
-      dateObj["$gte"] = new Date(req.query.from);
+    if (req.query.from || req.query.to) {
+      filter.date = {};
+      if (req.query.from) filter.date["$gte"] = new Date(req.query.from);
+      if (req.query.to) filter.date["$lte"] = new Date(req.query.to);
+    }
 
-    if (req.query.to !== undefined) dateObj["$lte"] = new Date(req.query.to);
+    const exercises = await Exercise.find(filter).sort({ date: 1 });
 
-    if (Object.keys(dateObj).length > 0) query.find({ date: dateObj });
+    const limit = req.query.limit ? Number(req.query.limit) : exercises.length;
 
-    if (req.query.limit) query.limit(Number(req.query.limit));
+    const logList = exercises.slice(0, limit);
 
-    const exercises = await query;
-
-    const log = exercises.map((val) => ({
+    const log = logList.map((val) => ({
       description: val.description,
       duration: +val.duration,
       date: val.date.toDateString(),
@@ -74,7 +74,7 @@ app.get("/api/users/:_id/logs", async (req, res) => {
     res.json({
       username: user.username,
       _id: user._id,
-      count: log.length,
+      count: exercises.length,
       log: log,
     });
   } catch (err) {
@@ -128,11 +128,11 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
     const durationNum = Number(duration);
     const dateObj = date ? new Date(date) : new Date();
 
-    if (isNaN(durationNum) || isNaN(dateObj.getTime())) {
+    if (isNaN(durationNum) || durationNum <= 0 || isNaN(dateObj.getTime())) {
       return res.status(400).json({
         status: "fail",
         message:
-          "Description must be 'string', duration 'number' and a date written in the format 'yyyy-mm-dd'",
+          "Description must be 'string', duration positive 'number' and a date written in the format 'yyyy-mm-dd'",
       });
     }
 
